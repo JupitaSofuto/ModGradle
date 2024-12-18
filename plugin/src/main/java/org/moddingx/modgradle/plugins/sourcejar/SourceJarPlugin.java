@@ -11,6 +11,7 @@ import org.gradle.api.file.FileCollection;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.bundling.Jar;
 import org.gradle.api.tasks.compile.JavaCompile;
+import org.gradle.language.jvm.tasks.ProcessResources;
 import org.moddingx.modgradle.ModGradle;
 import org.moddingx.modgradle.api.Versioning;
 import org.moddingx.modgradle.api.task.MergeMappingsTask;
@@ -35,46 +36,50 @@ public class SourceJarPlugin implements Plugin<Project> {
         ModGradle.initialiseProject(project);
 
         SourceJarExtension ext = project.getExtensions().create(SourceJarExtension.EXTENSION_NAME, SourceJarExtension.class);
-        
-        GenerateSRG generateMappings = MgUtil.task(project, "createMcpToSrg", GenerateSRG.class);
-        if (generateMappings == null) throw new IllegalStateException("The SourceJar plugin can't find the MCP -> SRG mappings.");
-        
-        JavaCompile compileTask = MgUtil.task(project, "compileJava", JavaCompile.class);
-        if (compileTask == null) {
-            System.out.println("The SourceJar plugin was not able to find the `compileJava` task. You might need to configure stuff manually.");
-        }
-
-        String jarTaskName = ext.jarTaskName;
-        Jar jarTask = MgUtil.task(project, jarTaskName, Jar.class);
-        if (compileTask == null) {
-            System.out.printf("The SourceJar plugin was not able to find the `%s` task. You might need to configure stuff manually.%n", jarTaskName);
-        }
-
-        String reobfJarTaskName = ext.reobfJarTaskName;
-        Task reobfJarTask = MgUtil.task(project, reobfJarTaskName, Task.class);
-        Task buildTask = MgUtil.task(project, "build", Task.class);
 
         ExtractInheritanceTask extractInheritance = project.getTasks().create("sourceJarExtractInheritance", ExtractInheritanceTask.class);
-        extractInheritance.getOutputs().upToDateWhen(t -> false);
-        if (compileTask != null) extractInheritance.dependsOn(compileTask);
         SourceMappingsTask createSourceMappings = project.getTasks().create("sourceJarGenerateMappings", SourceMappingsTask.class);
-        createSourceMappings.getOutputs().upToDateWhen(t -> false);
-        createSourceMappings.dependsOn(extractInheritance, generateMappings);
         MergeMappingsTask mergeSourceMappings = project.getTasks().create("sourceJarMergeMappings", MergeMappingsTask.class);
-        mergeSourceMappings.getOutputs().upToDateWhen(t -> false);
-        mergeSourceMappings.dependsOn(generateMappings, createSourceMappings);
         ExtractRangeMap createRangeMap = project.getTasks().create("sourceJarRangeExtract", ExtractRangeMap.class);
-        createRangeMap.getOutputs().upToDateWhen(t -> false);
-        if (compileTask != null) createRangeMap.dependsOn(compileTask);
         ApplyRangeMap applyRangeMap = project.getTasks().create("sourceJarRangeApply", ApplyRangeMap.class);
-        applyRangeMap.getOutputs().upToDateWhen(t -> false);
-        applyRangeMap.dependsOn(createRangeMap, mergeSourceMappings);
         MergeJarWithSourcesTask mergeJars = project.getTasks().create("sourceJar", MergeJarWithSourcesTask.class);
-        if (jarTask != null) mergeJars.dependsOn(jarTask);
-        if (jarTask != null && reobfJarTask != null) mergeJars.dependsOn(reobfJarTask);
-        mergeJars.dependsOn(applyRangeMap);
-        if (buildTask != null) buildTask.dependsOn(mergeJars);
         project.afterEvaluate(p -> {
+            GenerateSRG generateMappings = MgUtil.task(project, "createMcpToSrg", GenerateSRG.class);
+            if (generateMappings == null) throw new IllegalStateException("The SourceJar plugin can't find the MCP -> SRG mappings.");
+
+            JavaCompile compileTask = MgUtil.task(project, "compileJava", JavaCompile.class);
+            if (compileTask == null) {
+                System.out.println("The SourceJar plugin was not able to find the `compileJava` task. You might need to configure stuff manually.");
+            }
+
+            ProcessResources resourcesTask = MgUtil.task(project, "processResources", ProcessResources.class);
+
+            Jar jarTask = MgUtil.task(project, ext.jarTaskName, Jar.class);
+            if (compileTask == null) {
+                System.out.printf("The SourceJar plugin was not able to find the `%s` task. You might need to configure stuff manually.%n", ext.jarTaskName);
+            }
+
+            Task reobfJarTask = MgUtil.task(project, ext.reobfJarTaskName, Task.class);
+            Task buildTask = MgUtil.task(project, "build", Task.class);
+
+            // Task configuration
+            extractInheritance.getOutputs().upToDateWhen(t -> false);
+            if (compileTask != null) extractInheritance.dependsOn(compileTask);
+            if (resourcesTask != null) extractInheritance.dependsOn(resourcesTask);
+            createSourceMappings.getOutputs().upToDateWhen(t -> false);
+            createSourceMappings.dependsOn(extractInheritance, generateMappings);
+            mergeSourceMappings.getOutputs().upToDateWhen(t -> false);
+            mergeSourceMappings.dependsOn(generateMappings, createSourceMappings);
+            createRangeMap.getOutputs().upToDateWhen(t -> false);
+            if (compileTask != null) createRangeMap.dependsOn(compileTask);
+            applyRangeMap.getOutputs().upToDateWhen(t -> false);
+            applyRangeMap.dependsOn(createRangeMap, mergeSourceMappings);
+
+            if (jarTask != null) mergeJars.dependsOn(jarTask);
+            if (jarTask != null && reobfJarTask != null) mergeJars.dependsOn(reobfJarTask);
+            mergeJars.dependsOn(applyRangeMap);
+            if (buildTask != null) buildTask.dependsOn(mergeJars);
+
             Set<File> sources = new HashSet<>(JavaEnv.getJavaSources(project).get().getJava().getSrcDirs());
             sources.addAll(ext.getAdditionalSources());
             
