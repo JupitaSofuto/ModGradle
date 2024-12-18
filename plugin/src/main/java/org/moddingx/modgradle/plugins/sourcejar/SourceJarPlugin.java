@@ -43,13 +43,15 @@ public class SourceJarPlugin implements Plugin<Project> {
         if (compileTask == null) {
             System.out.println("The SourceJar plugin was not able to find the `compileJava` task. You might need to configure stuff manually.");
         }
-        
-        Jar jarTask = MgUtil.task(project, "jar", Jar.class);
+
+        String jarTaskName = ext.jarTaskName;
+        Jar jarTask = MgUtil.task(project, jarTaskName, Jar.class);
         if (compileTask == null) {
-            System.out.println("The SourceJar plugin was not able to find the `jar` task. You might need to configure stuff manually.");
+            System.out.printf("The SourceJar plugin was not able to find the `%s` task. You might need to configure stuff manually.%n", jarTaskName);
         }
-        
-        Task reobfJarTask = MgUtil.task(project, "reobfJar", Task.class);
+
+        String reobfJarTaskName = ext.reobfJarTaskName;
+        Task reobfJarTask = MgUtil.task(project, reobfJarTaskName, Task.class);
         Task buildTask = MgUtil.task(project, "build", Task.class);
 
         ExtractInheritanceTask extractInheritance = project.getTasks().create("sourceJarExtractInheritance", ExtractInheritanceTask.class);

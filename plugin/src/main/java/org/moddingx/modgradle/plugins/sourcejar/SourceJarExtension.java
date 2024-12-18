@@ -20,6 +20,9 @@ public class SourceJarExtension extends GroovyObjectSupport {
     private final Set<File> additionalSources;
     private final ConfigurableFileCollection additionalClasspath;
 
+    String jarTaskName = "jar";
+    String reobfJarTaskName = "reobf" + jarTaskName;
+
     public SourceJarExtension(Project project) {
         this.project = project;
         this.additionalSources = new HashSet<>();
@@ -37,7 +40,12 @@ public class SourceJarExtension extends GroovyObjectSupport {
     public void additionalClasspath(FileCollection cp) {
         this.additionalClasspath.from(cp);
     }
-    
+
+    public void jarTask(String jarTaskName) {
+        this.jarTaskName = jarTaskName;
+        this.reobfJarTaskName = "reobf" + jarTaskName;
+    }
+
     @Internal
     public Set<File> getAdditionalSources() {
         return Collections.unmodifiableSet(this.additionalSources);
